@@ -1,1 +1,62 @@
+Difference Between Two Dates = 
 
+VAR maxdate = 
+    IF(MAX('Date'[date]) < MAX('Prices Table 2'[date]), MAX('Prices Table 2'[date]), MAX('Date'[date]))    
+VAR earlypricestable = 
+SELECTCOLUMNS(
+    TOPN( 1,
+        CALCULATETABLE(
+            SUMMARIZE(
+                'Prices Table 2',
+                'Prices Table 2'[sku],
+                'Prices Table 2'[date],
+                'Prices Table 2'[currency],
+                "ID", CONCATENATE('Prices Table 2'[sku], 'Prices Table 2'[currency]),
+                "Early Price", MAX('Prices Table 2'[price])
+        ), NOT ISBLANK('Prices Table 2'[price]) && 'Prices Table 2'[date] >= MIN('Date'[date])
+        ),
+            'Prices Table 2'[date], ASC
+    ),
+    "Early SKU", [sku],
+    "Early Date", [date],
+    "Early Currency", [currency],
+    "ID", [ID],
+    "Early Price", [Early Price]
+)
+
+VAR laterpricestable = 
+SELECTCOLUMNS(
+    TOPN( 1,
+    CALCULATETABLE(
+            SUMMARIZE(
+                'Prices Table 2',
+                'Prices Table 2'[sku],
+                'Prices Table 2'[date],
+                'Prices Table 2'[currency],
+                "ID", CONCATENATE('Prices Table 2'[sku], 'Prices Table 2'[currency]),
+                "Later Price", MAX('Prices Table 2'[price])
+            ), NOT ISBLANK('Prices Table 2'[price]) && 'Prices Table 2'[date] <= maxdate
+        ),
+            'Prices Table 2'[date], DESC
+    ),
+    "Later SKU", [sku],
+    "Later Date", [date],
+    "Later Currency", [currency],
+    "ID", [ID],
+    "Later Price", [Later Price]
+)
+
+RETURN
+AVERAGEX(
+    FILTER(
+    NATURALLEFTOUTERJOIN(
+        earlypricestable,
+        laterpricestable
+    ),
+    NOT ISBLANK([Early SKU]) && 
+    NOT ISBLANK([Later SKU]) && 
+    NOT ISBLANK([Early Currency]) && 
+    NOT ISBLANK([Later Currency])
+),
+    DIVIDE([Later Price] - [Early Price], [Early Price])
+)
